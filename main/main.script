@@ -1,0 +1,103 @@
+Node = require "main.node"
+data = require "main.data"
+local columns = 6
+local rows = 6
+
+function init(self)
+	math.randomseed(os.time()*99999)
+	self.state = nil
+	self.id = nil
+	self.mines = nil
+	self.type = nil
+	self.label_url = nil
+	self.sprite_url = nil
+	self.nodes = {}
+	for y = 1,columns do
+		self.nodes[y] = {}
+		for x = 1,rows do
+			local pos = data.tile2world(vmath.vector3(x,y,0))
+			local node = Node.new(pos)
+			node.spawned = factory.create("go#nodefactory",pos,nil,nil,data.scale)
+			local int = math.random(1,2)
+			if int == 1 then
+				node.type = "mine"
+			elseif int == 2 then
+				node.type = "empty"
+			end
+			self.nodes[y][x] = node
+		end
+	end
+	mt = {__index = function(table, key)
+		return "pass" end}
+		self.nodes = setmetatable(self.nodes,mt)
+	for y=1,columns do
+		for x=1,rows do
+			self.nodes[y][x]:add_adjacent_vertex(self.nodes[y][x+1])
+			self.nodes[y][x]:add_adjacent_vertex(self.nodes[y][x-1])
+			self.nodes[y][x]:add_adjacent_vertex(self.nodes[y+1][x])
+			self.nodes[y][x]:add_adjacent_vertex(self.nodes[y-1][x])
+			self.nodes[y][x]:add_adjacent_vertex(self.nodes[y+1][x+1])
+			self.nodes[y][x]:add_adjacent_vertex(self.nodes[y-1][x-1])
+			self.nodes[y][x]:add_adjacent_vertex(self.nodes[y-1][x+1])
+			self.nodes[y][x]:add_adjacent_vertex(self.nodes[y+1][x-1])
+		end
+	end	
+end
+
+function final(self)
+	-- Add finalization code here
+	-- Learn more: https://defold.com/manuals/script/
+	-- Remove this function if not needed
+end
+
+function update(self, dt)
+	for y=1,columns do
+		for x=1,rows do
+			self.state = self.nodes[y][x].state
+			self.id = self.nodes[y][x].spawned
+			self.mines = self.nodes[y][x].minesaround
+			self.type = self.nodes[y][x].type
+			self.label_url = msg.url(nil, self.id, "count")
+			self.sprite_url = msg.url(nil, self.id , "sprite")
+			if self.state == true and self.type == "empty" then
+				if self.mines > 0 then
+					msg.post(self.sprite_url, "play_animation", { id = hash("emptynode_open") })
+					msg.post(self.label_url, "enable")
+					label.set_text(self.label_url, self.mines)
+				else
+					msg.post(self.label_url, "disable")
+					msg.post(self.sprite_url, "play_animation", { id = hash("emptynode_open") })
+				end
+			elseif self.state == true and self.type == "mine" then
+				msg.post(self.sprite_url, "play_animation", { id = hash("mine_open") })
+				msg.post(self.label_url, "disable")
+			else
+				msg.post(self.label_url, "disable")
+			end
+		end
+	end
+end
+
+function fixed_update(self, dt)
+	-- Add update code here
+	-- Learn more: https://defold.com/manuals/script/
+	-- Remove this function if not needed
+end
+
+function on_message(self, message_id, message, sender)
+	-- Add message-handling code here
+	-- Learn more: https://defold.com/manuals/message-passing/
+	-- Remove this function if not needed
+end
+
+function on_input(self, action_id, action)
+	if action_id == hash("touch") then
+		
+	end
+end
+
+function on_reload(self)
+	-- Add reload-handling code here
+	-- Learn more: https://defold.com/manuals/hot-reload/
+	-- Remove this function if not needed
+end
