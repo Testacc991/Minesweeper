@@ -5,8 +5,8 @@ main_collection = /main/main.collectionc
 shared_state = 1
 
 [display]
-width = 500
-height = 500
+width = 512
+height = 542
 
 [android]
 input_method = HiddenInputField
@@ -15,6 +15,12 @@ input_method = HiddenInputField
 title = Minesweeper
 
 [graphics]
-default_texture_min_filter = nearest
-default_texture_mag_filter = nearest
+default_texture_min_filter = linear
+default_texture_mag_filter = linear
+
+[label]
+max_count = 512
+
+[sprite]
+max_count = 512
 
