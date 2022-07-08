@@ -1,8 +1,31 @@
 Node = require "main.node"
 data = require "main.data"
-local columns = data.columns
-local rows = data.rows
+local columns = 0
+local rows = 0
+local hardness = 0
+local shift_x
+local shift_y
 
+
+local function world2tile(p)
+	return vmath.vector3(math.floor((p.x+data.tilesize-shift_x)/data.tilesize),
+	math.floor((p.y+data.tilesize-shift_y)/data.tilesize),0)
+end
+local function tile2world(p)
+	return vmath.vector3((p.x * data.tilesize)-(data.tilesize/2)+shift_x,
+	(p.y * data.tilesize)-(data.tilesize/2)+shift_y,0)
+end
+
+local function hidealllabels(self)
+	for y=1,columns do
+		for x=1,rows do
+			local node = self.nodes[y][x]
+			local id = node.spawned
+			local count = msg.url(nil, id, "count")
+			msg.post(count, "disable")
+		end
+	end
+end
 local function showallmines(self)
 	for y=1,columns do
 		for x=1,rows do
@@ -16,65 +39,57 @@ local function showallmines(self)
 end
 
 local function updateall(self)
-	if self.gameover == false then
-		for y=1,columns do
-			for x=1,rows do
-				self.flagged = self.nodes[y][x].flagged
-				self.state = self.nodes[y][x].state
-				self.id = self.nodes[y][x].spawned
-				self.mines = self.nodes[y][x].minesaround
-				self.type = self.nodes[y][x].type
-				self.label_url = msg.url(nil, self.id, "count")
-				self.sprite_url = msg.url(nil, self.id , "sprite")
-				if self.state and self.type == "empty" and not self.flagged then
-					if self.mines > 0 then
-						msg.post(self.sprite_url, "play_animation", { id = hash("emptynode_open") })
-						msg.post(self.label_url, "enable")
-						label.set_text(self.label_url, self.mines)
-					else
-						msg.post(self.label_url, "disable")
-						msg.post(self.sprite_url, "play_animation", { id = hash("emptynode_open") })
-					end
-				elseif self.state and self.type == "mine" and not self.flagged then
-					msg.post(self.sprite_url, "play_animation", { id = hash("mine_open") })
-					msg.post(self.label_url, "disable")
-					self.gameover = true
-				elseif not self.state and self.flagged then
-					msg.post(self.sprite_url, "play_animation", { id = hash("praporec") })
-					msg.post(self.label_url, "disable")
-				elseif not self.state and not self.flagged then
-					msg.post(self.sprite_url, "play_animation", { id = hash("hidenode") })
-					msg.post(self.label_url, "disable")
+	for y=1,columns do
+		for x=1,rows do
+			self.flagged = self.nodes[y][x].flagged
+			self.state = self.nodes[y][x].state
+			self.id = self.nodes[y][x].spawned
+			self.mines = self.nodes[y][x].minesaround
+			self.type = self.nodes[y][x].type
+			self.label_url = msg.url(nil, self.id, "count")
+			self.sprite_url = msg.url(nil, self.id , "sprite")
+			if self.state and self.type == "empty" and not self.flagged then
+				if self.mines > 0 then
+					msg.post(self.sprite_url, "play_animation", { id = hash("emptynode_open") })
+					msg.post(self.label_url, "enable")
+					label.set_text(self.label_url, self.mines)
 				else
 					msg.post(self.label_url, "disable")
+					msg.post(self.sprite_url, "play_animation", { id = hash("emptynode_open") })
 				end
+			elseif self.state and self.type == "mine" and not self.flagged then
+				msg.post(self.sprite_url, "play_animation", { id = hash("mine_open") })
+				msg.post(self.label_url, "disable")
+				self.game = false
+			elseif not self.state and self.flagged then
+				msg.post(self.sprite_url, "play_animation", { id = hash("praporec") })
+				msg.post(self.label_url, "disable")
+			elseif not self.state and not self.flagged then
+				msg.post(self.sprite_url, "play_animation", { id = hash("hidenode") })
+				msg.post(self.label_url, "disable")
+			else
+				msg.post(self.label_url, "disable")
 			end
 		end
 	end
 end
 
-function init(self)
-	msg.post(".", "acquire_input_focus")
-	math.randomseed(os.time()*99999)
-	self.gameover = false
-	
-	self.state = nil
-	self.id = nil
-	self.mines = nil
-	self.type = nil
-	self.label_url = nil
-	self.sprite_url = nil
-	self.nodes = {}
+local function createnodes(self)
+	local map_width = data.tilesize * rows
+	local map_height = data.tilesize * columns
+	local window_width, window_height = window.get_size()
+	shift_x = (window_width - map_width)/2
+	shift_y = (window_height - map_height)/2
 	for y = 1,columns do
 		self.nodes[y] = {}
 		for x = 1,rows do
-			local pos = data.tile2world(vmath.vector3(x,y,0))
+			local pos = tile2world(vmath.vector3(x,y,0))
 			local node = Node.new(pos)
 			node.spawned = factory.create("go#nodefactory",pos,nil,nil,data.scale)
 			local int = math.random(1,100)
-			if int < data.hardness then
+			if int < hardness then
 				node.type = "mine"
-			elseif int > data.hardness then
+			elseif int > hardness then
 				node.type = "empty"
 			else
 				node.type = "empty"
@@ -83,9 +98,9 @@ function init(self)
 			self.nodes[y][x] = node
 		end
 	end
-	mt = {__index = function(table, key)
-		return "pass" end}
-		self.nodes = setmetatable(self.nodes,mt)
+end
+
+local function createconnections(self)
 	for y=1,columns do
 		for x=1,rows do
 			self.nodes[y][x]:add_adjacent_vertex(self.nodes[y+1][x-1])
@@ -103,8 +118,35 @@ function init(self)
 			self.nodes[y][x]:add_straight_adjacent_vertex(self.nodes[y][x-1])
 		end
 	end
+end
+
+local function reset(self)
+	if not self.nodes then return true end
+	for y=1,columns do
+		for x=1,rows do
+			go.delete(self.nodes[y][x].spawned)
+			self.nodes[y][x].spawned = nil
+			--print(self.nodes[y][x].spawned)
+		end
+	end
+	self.nodes = {}
+	return true
+end
+
+
+function init(self)
+	msg.post(".", "acquire_input_focus")
+	math.randomseed(os.time()*99999)
+	self.game = false
+	
+	self.state = nil
+	self.id = nil
+	self.mines = nil
+	self.type = nil
+	self.label_url = nil
+	self.sprite_url = nil
+	self.nodes = {}
 	--showallmines(self)
-	updateall(self)
 end
 
 function final(self)
@@ -115,7 +157,7 @@ end
 
 
 function update(self, dt)
-	
+	updateall(self)
 end
 
 function fixed_update(self, dt)
@@ -125,48 +167,63 @@ function fixed_update(self, dt)
 end
 
 function on_message(self, message_id, message, sender)
-	-- Add message-handling code here
-	-- Learn more: https://defold.com/manuals/message-passing/
-	-- Remove this function if not needed
+	if message_id == hash("play") then
+		if reset(self) then
+		self.game = true
+		columns = math.floor(message.size)
+		rows = math.floor(message.size)
+		hardness = math.floor(message.diff)
+		print(data.columns)
+		mt = {__index = function(table, key)
+			return "pass" end}
+			self.nodes = setmetatable(self.nodes,mt)
+		createnodes(self)	
+		createconnections(self)
+		--hidealllabels(self)
+		end
+	end
 end
 
 function on_input(self, action_id, action)
 	if action_id == hash("touch") and action.released then
-		--print("lol")
-		local pos = vmath.vector3(action.x,action.y,0)
-		local touch = data.tile2world(data.world2tile(pos))
-		for y=1,columns do
-			for x=1,rows do 
-				local node = self.nodes[y][x]
-				if node.pos == touch and node.state == false and not node.flagged then
-					node.state = true 
-					node:show_straight_adjacent_vertex()
-					if node.type == "mine" then
-						showallmines(self)
-						print("game_over")
+		if self.game then
+			local pos = vmath.vector3(action.x,action.y,0)
+			local touch = tile2world(world2tile(pos))
+			for y=1,columns do
+				for x=1,rows do 
+					local node = self.nodes[y][x]
+					if node.pos == touch and node.state == false and not node.flagged then
+						node.state = true 
+						node:show_straight_adjacent_vertex()
+						if node.type == "mine" then
+							showallmines(self)
+							print("game_over")
+							self.game = false
+							msg.post("/gui#main", "show")
+						end
+					elseif node.pos == touch and node.state == true and not node.flagged then
+						node:show_adjacent_vertex()
 					end
-				elseif node.pos == touch and node.state == true and not node.flagged then
-					node:show_adjacent_vertex()
 				end
 			end
 		end
-		updateall(self)		
 	elseif action_id == hash("touch2") and action.released then
-		local pos = vmath.vector3(action.x,action.y,0)
-		local touch = data.tile2world(data.world2tile(pos))
-		for y=1,columns do
-			for x=1,rows do 
-				local node = self.nodes[y][x]
-				if node.pos == touch and node.state == false then
-					if not node.flagged then
-						node.flagged = true
-					elseif node.flagged then
-						node.flagged = false
+		if self.game then
+			local pos = vmath.vector3(action.x,action.y,0)
+			local touch = tile2world(world2tile(pos))
+			for y=1,columns do
+				for x=1,rows do 
+					local node = self.nodes[y][x]
+					if node.pos == touch and node.state == false then
+						if not node.flagged then
+							node.flagged = true
+						elseif node.flagged then
+							node.flagged = false
+						end
 					end
 				end
 			end
 		end
-		updateall(self)
 	end
 end
 
