@@ -4,9 +4,12 @@ function init(self)
 	self.play = gui.get_node("playbox")
 	self.difficult_value = 10
 	self.size_value = 10
-	self.container = gui.get_node("container")
+	--self.container = gui.get_node("container")
+	self.settingsbutton = gui.get_node("settingsbutton")
 	self.box = gui.get_node("box")
-	--self.sliders = gui.get_node("sliders")
+	self.playlabel = gui.get_node("play")
+	self.boxenabled = false
+	gui.set_enabled(self.box,false)
 end
 
 function final(self)
@@ -22,21 +25,31 @@ function update(self, dt)
 end
 
 function on_message(self, message_id, message, sender)
-	if message_id == hash("show") then
-		gui.set_enabled(self.container,true)
-		gui.set_enabled(self.box,true)
-	end	
+	if message_id == hash("youwin") then
+		gui.set_text(self.playlabel, "You win")
+	elseif message_id == hash("youloose") then
+		gui.set_text(self.playlabel, "You loose")
+	end
 end
 function on_input(self, action_id, action)
 	self.difficult_value = dirtylarry:slider("difficult", action_id, action, 0, 100, self.difficult_value)
-	self.size_value = dirtylarry:slider("size", action_id, action, 0, 19, self.size_value)
+	self.size_value = dirtylarry:slider("size", action_id, action, 0, 24, self.size_value)
 	if action_id == hash("touch") then
 		if action.released then
-			if gui.pick_node(self.play,action.x,action.y) and gui.is_enabled(self.container) then
+			if gui.pick_node(self.play,action.x,action.y) and gui.is_enabled(self.play) then
 				msg.post("go#main", "play",{size = self.size_value,diff = self.difficult_value})
-				gui.set_enabled(self.container,false)
 				gui.set_enabled(self.box,false)
-				--gui.set_enabled(self.sliders,false)
+				self.boxenabled = false
+				gui.set_text(self.playlabel, "Play")
+			end
+			if gui.pick_node(self.settingsbutton,action.x,action.y) then
+				if self.boxenabled then
+					gui.set_enabled(self.box,false)
+					self.boxenabled = false
+				elseif not self.boxenabled then
+					gui.set_enabled(self.box,true)
+					self.boxenabled = true
+				end
 			end
 		end
 	end	

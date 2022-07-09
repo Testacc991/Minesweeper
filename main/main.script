@@ -6,6 +6,15 @@ local hardness = 0
 local shift_x
 local shift_y
 
+local function countemptynodes(self)
+	for y=1,columns do
+		for x=1,rows do
+			if self.nodes[y][x].type == "empty" then
+				self.emptynodescount = self.emptynodescount + 1
+			end
+		end
+	end
+end
 
 local function world2tile(p)
 	return vmath.vector3(math.floor((p.x+data.tilesize-shift_x)/data.tilesize),
@@ -16,16 +25,24 @@ local function tile2world(p)
 	(p.y * data.tilesize)-(data.tilesize/2)+shift_y,0)
 end
 
-local function hidealllabels(self)
-	for y=1,columns do
-		for x=1,rows do
-			local node = self.nodes[y][x]
-			local id = node.spawned
-			local count = msg.url(nil, id, "count")
-			msg.post(count, "disable")
+local function checkwin(self)
+	if self.game then
+		local emptynodesopen = 0
+		for y=1,columns do
+			for x=1,rows do
+				if self.nodes[y][x].type == "empty" and self.nodes[y][x].state then
+					emptynodesopen = emptynodesopen + 1
+				end
+			end
+		end
+		if emptynodesopen == self.emptynodescount then
+			print("you_win")
+			msg.post("/gui#main", "youwin")
+			self.game = false
 		end
 	end
 end
+
 local function showallmines(self)
 	for y=1,columns do
 		for x=1,rows do
@@ -94,7 +111,6 @@ local function createnodes(self)
 			else
 				node.type = "empty"
 			end
-			--node.type = "empty"
 			self.nodes[y][x] = node
 		end
 	end
@@ -125,19 +141,23 @@ local function reset(self)
 	for y=1,columns do
 		for x=1,rows do
 			go.delete(self.nodes[y][x].spawned)
-			self.nodes[y][x].spawned = nil
 			--print(self.nodes[y][x].spawned)
+			self.nodes[y][x].spawned = nil
 		end
 	end
-	self.nodes = {}
+	print("end")
+	--self.nodes = {}
 	return true
 end
 
 
 function init(self)
+	--profiler.enable_ui(true)
 	msg.post(".", "acquire_input_focus")
 	math.randomseed(os.time()*99999)
 	self.game = false
+	
+	self.emptynodescount = 0
 	
 	self.state = nil
 	self.id = nil
@@ -158,6 +178,7 @@ end
 
 function update(self, dt)
 	updateall(self)
+	checkwin(self)
 end
 
 function fixed_update(self, dt)
@@ -169,15 +190,16 @@ end
 function on_message(self, message_id, message, sender)
 	if message_id == hash("play") then
 		if reset(self) then
+		self.emptynodescount = 0
 		self.game = true
 		columns = math.floor(message.size)
 		rows = math.floor(message.size)
 		hardness = math.floor(message.diff)
-		print(data.columns)
 		mt = {__index = function(table, key)
 			return "pass" end}
 			self.nodes = setmetatable(self.nodes,mt)
 		createnodes(self)	
+		countemptynodes(self)
 		createconnections(self)
 		--hidealllabels(self)
 		end
@@ -198,8 +220,8 @@ function on_input(self, action_id, action)
 						if node.type == "mine" then
 							showallmines(self)
 							print("game_over")
+							msg.post("/gui#main", "youloose")
 							self.game = false
-							msg.post("/gui#main", "show")
 						end
 					elseif node.pos == touch and node.state == true and not node.flagged then
 						node:show_adjacent_vertex()
