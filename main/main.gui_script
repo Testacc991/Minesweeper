@@ -1,5 +1,8 @@
 local dirtylarry = require "dirtylarry/dirtylarry"
+local chas = nil
 function init(self)
+	self.timercount = 0
+	
 	msg.post(".", "acquire_input_focus")
 	self.play = gui.get_node("playbox")
 	self.difficult_value = 10
@@ -7,9 +10,15 @@ function init(self)
 	--self.container = gui.get_node("container")
 	self.settingsbutton = gui.get_node("settingsbutton")
 	self.box = gui.get_node("box")
-	self.playlabel = gui.get_node("play")
+	self.emoji = gui.get_node("emoji")
 	self.boxenabled = false
+	self.timer = gui.get_node("text")
+	self.bombs = gui.get_node("text1")
 	gui.set_enabled(self.box,false)
+
+	gui.set_texture(self.settingsbutton, "main")
+	gui.set_texture(self.play, "main")
+	gui.set_texture(self.emoji, "main")
 end
 
 function final(self)
@@ -17,36 +26,64 @@ function final(self)
 	-- Learn more: https://defold.com/manuals/script/
 	-- Remove this function if not needed
 end
+local function playbutanim(self,node)
+	gui.play_flipbook(node, "emptynode_open")
+	timer.delay(0.1, false, function() gui.play_flipbook(node, "hidenode") end)
+end
 
 function update(self, dt)
 	-- Add update code here
 	-- Learn more: https://defold.com/manuals/script/
 	-- Remove this function if not needed
 end
-
+local function cancelchas(self)
+	if chas then
+		timer.cancel(chas)
+		self.timercount = 0
+	end
+end
 function on_message(self, message_id, message, sender)
 	if message_id == hash("youwin") then
-		gui.set_text(self.playlabel, "You win")
+		gui.play_flipbook(self.emoji, "smile")
+		cancelchas(self)
 	elseif message_id == hash("youloose") then
-		gui.set_text(self.playlabel, "You loose")
+		gui.play_flipbook(self.emoji, "dead")
+		cancelchas(self)
+	elseif message_id == hash("minescount") then
+		gui.set_text(self.bombs, message.count)
 	end
 end
 function on_input(self, action_id, action)
 	self.difficult_value = dirtylarry:slider("difficult", action_id, action, 0, 100, self.difficult_value)
-	self.size_value = dirtylarry:slider("size", action_id, action, 0, 24, self.size_value)
+	self.size_value = dirtylarry:slider("size", action_id, action, 0, 20, self.size_value)
 	if action_id == hash("touch") then
 		if action.released then
 			if gui.pick_node(self.play,action.x,action.y) and gui.is_enabled(self.play) then
+				playbutanim(self,self.play)
 				msg.post("go#main", "play",{size = self.size_value,diff = self.difficult_value})
 				gui.set_enabled(self.box,false)
 				self.boxenabled = false
-				gui.set_text(self.playlabel, "Play")
+				gui.play_flipbook(self.emoji, "good")
+				cancelchas(self)
+				chas = timer.delay(1, true, 
+				function()
+					if not self.boxenabled then
+						self.timercount = self.timercount+1
+						gui.set_text(self.timer, self.timercount)
+					end
+				end)	
 			end
 			if gui.pick_node(self.settingsbutton,action.x,action.y) then
+				
+				playbutanim(self,self.settingsbutton)
 				if self.boxenabled then
+					gui.play_flipbook(self.emoji, "good")
+					msg.post("go#main", "continue")
 					gui.set_enabled(self.box,false)
 					self.boxenabled = false
 				elseif not self.boxenabled then
+					gui.play_flipbook(self.emoji, "sleep")
+					msg.post("go#main", "pause")
 					gui.set_enabled(self.box,true)
 					self.boxenabled = true
 				end

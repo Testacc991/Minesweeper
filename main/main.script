@@ -16,6 +16,16 @@ local function countemptynodes(self)
 	end
 end
 
+local function countmines(self)
+	for y=1,columns do
+		for x=1,rows do
+			if self.nodes[y][x].type == "mine" then
+				self.minescount = self.minescount + 1
+			end
+		end
+	end
+end
+
 local function world2tile(p)
 	return vmath.vector3(math.floor((p.x+data.tilesize-shift_x)/data.tilesize),
 	math.floor((p.y+data.tilesize-shift_y)/data.tilesize),0)
@@ -94,7 +104,7 @@ end
 local function createnodes(self)
 	local map_width = data.tilesize * rows
 	local map_height = data.tilesize * columns
-	local window_width, window_height = window.get_size()
+	local window_width, window_height = 768, 768
 	shift_x = (window_width - map_width)/2
 	shift_y = (window_height - map_height)/2
 	for y = 1,columns do
@@ -141,15 +151,12 @@ local function reset(self)
 	for y=1,columns do
 		for x=1,rows do
 			go.delete(self.nodes[y][x].spawned)
-			--print(self.nodes[y][x].spawned)
 			self.nodes[y][x].spawned = nil
 		end
 	end
 	print("end")
-	--self.nodes = {}
 	return true
 end
-
 
 function init(self)
 	--profiler.enable_ui(true)
@@ -158,6 +165,7 @@ function init(self)
 	self.game = false
 	
 	self.emptynodescount = 0
+	self.minescount = 0
 	
 	self.state = nil
 	self.id = nil
@@ -169,22 +177,9 @@ function init(self)
 	--showallmines(self)
 end
 
-function final(self)
-	-- Add finalization code here
-	-- Learn more: https://defold.com/manuals/script/
-	-- Remove this function if not needed
-end
-
-
 function update(self, dt)
 	updateall(self)
 	checkwin(self)
-end
-
-function fixed_update(self, dt)
-	-- Add update code here
-	-- Learn more: https://defold.com/manuals/script/
-	-- Remove this function if not needed
 end
 
 function on_message(self, message_id, message, sender)
@@ -200,9 +195,15 @@ function on_message(self, message_id, message, sender)
 			self.nodes = setmetatable(self.nodes,mt)
 		createnodes(self)	
 		countemptynodes(self)
+		countmines(self)
+		msg.post("/gui#main", "minescount",{count = self.minescount})
 		createconnections(self)
 		--hidealllabels(self)
 		end
+	elseif message_id == hash("pause") then
+		self.game = false
+	elseif message_id == hash("continue") then
+		self.game = true
 	end
 end
 
@@ -238,8 +239,14 @@ function on_input(self, action_id, action)
 					local node = self.nodes[y][x]
 					if node.pos == touch and node.state == false then
 						if not node.flagged then
-							node.flagged = true
+							if self.minescount > 0 then
+								self.minescount = self.minescount-1
+								msg.post("/gui#main", "minescount",{count = self.minescount})
+								node.flagged = true
+							end
 						elseif node.flagged then
+							self.minescount = self.minescount+1
+							msg.post("/gui#main", "minescount",{count = self.minescount})
 							node.flagged = false
 						end
 					end
@@ -247,10 +254,4 @@ function on_input(self, action_id, action)
 			end
 		end
 	end
-end
-
-function on_reload(self)
-	-- Add reload-handling code here
-	-- Learn more: https://defold.com/manuals/hot-reload/
-	-- Remove this function if not needed
 end

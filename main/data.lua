@@ -1,9 +1,9 @@
 local M = {}
 M.hardness = 10
-M.mult = 0.4
+M.mult = 0.5
 M.columns = 0
 M.rows = 0
-M.tilesize = math.floor(66*M.mult)
+M.tilesize = math.floor(64*M.mult)
 M.scale = 1*M.mult
 
 function M.world2tile(p)
