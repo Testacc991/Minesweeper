@@ -27,12 +27,12 @@ local function countmines(self)
 end
 
 local function world2tile(p)
-	return vmath.vector3(math.floor((p.x+data.tilesize-shift_x)/data.tilesize),
-	math.floor((p.y+data.tilesize-shift_y)/data.tilesize),0)
+	return vmath.vector3(math.floor(p.x/data.tilesize+1-(shift_x/data.tilesize)),
+	math.floor(p.y/data.tilesize+1-(shift_y/data.tilesize)),0)
 end
 local function tile2world(p)
-	return vmath.vector3((p.x * data.tilesize)-(data.tilesize/2)+shift_x,
-	(p.y * data.tilesize)-(data.tilesize/2)+shift_y,0)
+	return vmath.vector3((p.x * data.tilesize-data.tilesize/2)+shift_x,
+	(p.y * data.tilesize-data.tilesize/2)+shift_y,0)
 end
 
 local function checkwin(self)
@@ -106,10 +106,11 @@ local function createnodes(self)
 	local map_height = data.tilesize * columns
 	local window_width, window_height = 768, 768
 	shift_x = (window_width - map_width)/2
-	shift_y = (window_height - map_height)/2
+	shift_y = (window_height - map_height)/2-20
 	for y = 1,columns do
 		self.nodes[y] = {}
 		for x = 1,rows do
+			--local pos = vmath.vector3(x,y,0)
 			local pos = tile2world(vmath.vector3(x,y,0))
 			local node = Node.new(pos)
 			node.spawned = factory.create("go#nodefactory",pos,nil,nil,data.scale)
@@ -185,6 +186,7 @@ end
 function on_message(self, message_id, message, sender)
 	if message_id == hash("play") then
 		if reset(self) then
+		self.minescount = 0
 		self.emptynodescount = 0
 		self.game = true
 		columns = math.floor(message.size)

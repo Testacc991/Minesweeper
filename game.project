@@ -13,7 +13,7 @@ input_method = HiddenInputField
 
 [project]
 title = Minesweeper
-dependencies#0 = https://github.com/andsve/dirtylarry/archive/master.zip
+dependencies = 
 
 [graphics]
 default_texture_min_filter = linear
@@ -27,4 +27,7 @@ max_count = 2048
 
 [collection]
 max_instances = 2048
+
+[library]
+include_dirs = dirtylarry
 
